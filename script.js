@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check for saved theme preference or use system preference
     const savedTheme = localStorage.getItem('theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
+
     if (savedTheme) {
         htmlElement.setAttribute('data-theme', savedTheme);
     } else if (systemPrefersDark) {
@@ -16,8 +16,15 @@ document.addEventListener('DOMContentLoaded', () => {
     themeToggle.addEventListener('click', () => {
         const currentTheme = htmlElement.getAttribute('data-theme');
         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        
+
         htmlElement.setAttribute('data-theme', newTheme);
         localStorage.setItem('theme', newTheme);
     });
+
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+            .then((reg) => console.log('Service Worker Registered', reg))
+            .catch((err) => console.log('Service Worker Registration Failed', err));
+    }
 });
