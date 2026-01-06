@@ -59,19 +59,66 @@ document.addEventListener('DOMContentLoaded', () => {
         handleFiles(e.target.files);
     });
 
+    // State
+    let currentFile = null;
+    let compressedBlob = null;
+
+    // elements
+    const settingsPanel = document.getElementById('settings-panel');
+    const targetSizeInput = document.getElementById('target-size');
+    const qualitySlider = document.getElementById('quality-slider');
+    const qualityValue = document.getElementById('quality-value');
+    const originalSizeEl = document.getElementById('original-size');
+    const compressedSizeEl = document.getElementById('compressed-size');
+    const compressBtn = document.getElementById('compress-btn');
+    const downloadBtn = document.getElementById('download-btn');
+
+    // UI Listeners
+    qualitySlider.addEventListener('input', (e) => {
+        qualityValue.textContent = `${e.target.value}%`;
+        // Clear target size if slider is moved manually
+        if (targetSizeInput.value) targetSizeInput.value = '';
+    });
+
+    targetSizeInput.addEventListener('input', () => {
+        // Optional: Provide feedback or disable slider
+    });
+
+    compressBtn.addEventListener('click', () => {
+        if (currentFile) processCompression(currentFile);
+    });
+
+    downloadBtn.addEventListener('click', () => {
+        if (compressedBlob) {
+            const url = URL.createObjectURL(compressedBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `compressed-${currentFile.name}`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    });
+
     function handleFiles(files) {
         if (!files.length) return;
 
-        Array.from(files).forEach(file => {
-            if (!file.type.startsWith('image/')) {
-                alert('Only image files are allowed!');
-                return;
-            }
-            addFilePreview(file);
-        });
+        const file = files[0]; // Handle single file for now
+        if (!file.type.startsWith('image/')) {
+            alert('Only image files are allowed!');
+            return;
+        }
+
+        currentFile = file;
+        originalSizeEl.textContent = formatBytes(file.size);
+        compressedSizeEl.textContent = '-';
+        downloadBtn.disabled = true;
+        settingsPanel.classList.remove('hidden'); // Show settings
+
+        addFilePreview(file);
     }
 
     function addFilePreview(file) {
+        previewContainer.innerHTML = ''; // Clear previous
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onloadend = () => {
@@ -83,6 +130,85 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             previewContainer.appendChild(div);
         };
+    }
+
+    async function processCompression(file) {
+        compressBtn.textContent = 'Compressing...';
+        compressBtn.disabled = true;
+
+        try {
+            const targetKB = parseFloat(targetSizeInput.value);
+            const useTargetSize = !isNaN(targetKB) && targetKB > 0;
+
+            if (useTargetSize) {
+                // Binary Search for Quality
+                compressedBlob = await compressToTargetSize(file, targetKB * 1024);
+            } else {
+                // Manual Quality
+                const quality = parseInt(qualitySlider.value) / 100;
+                compressedBlob = await compressImageValid(file, quality);
+            }
+
+            // Update UI
+            compressedSizeEl.textContent = formatBytes(compressedBlob.size);
+            downloadBtn.disabled = false;
+        } catch (error) {
+            console.error(error);
+            alert('Compression failed.');
+        } finally {
+            compressBtn.textContent = 'Compress';
+            compressBtn.disabled = false;
+        }
+    }
+
+    async function compressToTargetSize(file, maxBytes) {
+        let min = 0.01;
+        let max = 1.0;
+        let bestBlob = null;
+
+        // Iterative binary search (max 6 steps)
+        for (let i = 0; i < 6; i++) {
+            const mid = (min + max) / 2;
+            const blob = await compressImageValid(file, mid);
+
+            if (blob.size <= maxBytes) {
+                bestBlob = blob; // Found a candidate
+                min = mid; // Try for better quality
+            } else {
+                max = mid; // Too big, reduce quality
+            }
+        }
+
+        // If we found a valid blob, return it. Otherwise return the smallest one we found (min quality)
+        return bestBlob || await compressImageValid(file, 0.01);
+    }
+
+    function compressImageValid(file, quality) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+
+                canvas.toBlob((blob) => {
+                    resolve(blob);
+                }, file.type, quality);
+            };
+            img.onerror = reject;
+        });
+    }
+
+    function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
     }
 
     // Register Service Worker

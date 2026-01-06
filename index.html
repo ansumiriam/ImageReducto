@@ -63,6 +63,38 @@
                 </div>
 
                 <div id="preview-container" class="preview-container"></div>
+
+                <!-- Compression Settings -->
+                <div id="settings-panel" class="settings-panel hidden">
+                    <h3>Compression Settings</h3>
+
+                    <div class="control-group">
+                        <label for="target-size">Target Size (KB)</label>
+                        <input type="number" id="target-size" placeholder="e.g. 500" min="1">
+                    </div>
+
+                    <div class="control-group">
+                        <label>Quality: <span id="quality-value">80%</span></label>
+                        <input type="range" id="quality-slider" min="0" max="100" value="80">
+                    </div>
+
+                    <div class="stats-container">
+                        <div class="stat-item">
+                            <span>Original</span>
+                            <strong id="original-size">-</strong>
+                        </div>
+                        <div class="stat-divider">→</div>
+                        <div class="stat-item">
+                            <span>Compressed</span>
+                            <strong id="compressed-size">-</strong>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button id="compress-btn" class="secondary-btn">Compress</button>
+                        <button id="download-btn" class="primary-btn" disabled>Download Image</button>
+                    </div>
+                </div>
             </section>
 
             <section class="glass-card info-section">
