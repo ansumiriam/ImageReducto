@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('ImageReducto v2.0 - Auto-Downscaling Active');
     const themeToggle = document.getElementById('theme-toggle');
     const htmlElement = document.documentElement;
 

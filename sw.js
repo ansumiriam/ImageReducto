@@ -1,4 +1,4 @@
-const CACHE_NAME = 'image-reducto-v1';
+const CACHE_NAME = 'image-reducto-v2-fix';
 const ASSETS = [
     './',
     './index.html',
