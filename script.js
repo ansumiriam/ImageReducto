@@ -93,7 +93,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const url = URL.createObjectURL(compressedBlob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `compressed-${currentFile.name}`;
+            // Ensure correct extension
+            const originalName = currentFile.name.substring(0, currentFile.name.lastIndexOf('.'));
+            a.download = `compressed-${originalName}.jpg`;
             a.click();
             URL.revokeObjectURL(url);
         }
@@ -140,6 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const targetKB = parseFloat(targetSizeInput.value);
             const useTargetSize = !isNaN(targetKB) && targetKB > 0;
 
+            console.log(`Starting compression. Target KB: ${targetKB}, Use Target: ${useTargetSize}`);
+
             if (useTargetSize) {
                 // Binary Search for Quality
                 compressedBlob = await compressToTargetSize(file, targetKB * 1024);
@@ -165,38 +169,58 @@ document.addEventListener('DOMContentLoaded', () => {
         let min = 0.01;
         let max = 1.0;
         let bestBlob = null;
+        let scale = 1.0; // Start at full resolution
 
-        // Iterative binary search (max 6 steps)
+        // 1. Try adjusting quality first (Binary Search)
         for (let i = 0; i < 6; i++) {
             const mid = (min + max) / 2;
-            const blob = await compressImageValid(file, mid);
+            const blob = await compressImageValid(file, mid, scale);
+
+            console.log(`Quality Search ${i}: Q=${mid.toFixed(2)} -> Size ${blob.size}`);
 
             if (blob.size <= maxBytes) {
-                bestBlob = blob; // Found a candidate
-                min = mid; // Try for better quality
+                bestBlob = blob;
+                min = mid;
             } else {
-                max = mid; // Too big, reduce quality
+                max = mid;
             }
         }
 
-        // If we found a valid blob, return it. Otherwise return the smallest one we found (min quality)
-        return bestBlob || await compressImageValid(file, 0.01);
+        // 2. If even lowest quality is too big, start Downscaling
+        let currentBlob = bestBlob || await compressImageValid(file, 0.01, scale);
+
+        while (currentBlob.size > maxBytes && scale > 0.1) {
+            scale -= 0.1; // Reduce size by 10% each step
+            console.log(`Downscaling: Scale=${scale.toFixed(1)}`);
+            currentBlob = await compressImageValid(file, 0.5, scale); // Reset quality to mid-range for resized image
+        }
+
+        return currentBlob;
     }
 
-    function compressImageValid(file, quality) {
+    function compressImageValid(file, quality, scale = 1.0) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.src = URL.createObjectURL(file);
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
+                // Apply scaling
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
 
+                const ctx = canvas.getContext('2d');
+
+                // Draw white background
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw image with scaling
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                // Force image/jpeg to ensure compression quality works
                 canvas.toBlob((blob) => {
                     resolve(blob);
-                }, file.type, quality);
+                }, 'image/jpeg', quality);
             };
             img.onerror = reject;
         });
